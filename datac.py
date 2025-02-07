@@ -1,128 +1,167 @@
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
-import missingno as msno
+import missingno as msno  # Import missingno
 from scipy import stats
 
-df = pd.read_csv('scraped_data.csv')
+def load_data(filepath):
+    """Wczytuje dane z pliku CSV."""
+    df = pd.read_csv(filepath)
+    print(df.head())
+    print(df.dtypes)
+    msno.matrix(df)  # Wizualizacja braków danych
+    msno.heatmap(df)
+    return df
 
-print(df.head())
-print(df.dtypes)  # Sprawdź typy danych (usunięto nawiasy)
+def handle_missing_values(df):
+    """Wypełnia brakujące dane: średnią dla numerycznych, modą dla kategorycznych."""
+    df_filled = df.copy()
+    numeric_cols = df_filled.select_dtypes(include=np.number).columns
+    df_filled[numeric_cols] = df_filled[numeric_cols].fillna(df_filled[numeric_cols].mean())
 
-msno.matrix(df)
-msno.heatmap(df)  # Te wizualizacje możesz zostawić przed czyszczeniem, aby zobaczyć braki
+    for col in df_filled.columns:
+        if df_filled[col].dtype == 'object':
+            df_filled[col] = df_filled[col].fillna(df_filled[col].mode()[0])
+    return df_filled
 
-# 1. Wypełnij brakujące dane NAJPIERW (poprawnie)
-numeric_cols = df.select_dtypes(include=np.number).columns
-df_filled = df.copy()  # Pracuj na kopii, aby nie modyfikować oryginału
-df_filled[numeric_cols] = df_filled[numeric_cols].fillna(df_filled[numeric_cols].mean())
+def handle_outliers(df):
+    """Wykrywa i usuwa outliery (Z-score > 3)."""
+    numeric_cols = df.select_dtypes(include=np.number).columns
+    z_scores = np.abs(stats.zscore(df[numeric_cols]))
+    df_no_outliers = df[(z_scores < 3).all(axis=1)]
+    return df_no_outliers
 
-# Przykład obsługi kolumn nienumerycznych (jeśli są)
-for col in df.columns:
-    if df[col].dtype == 'object':  # Sprawdź, czy kolumna jest tekstowa
-        df_filled[col] = df_filled[col].fillna(df_filled[col].mode()[0])  # Wypełnij modą
+def handle_launched_column(df):
+    """Przetwarza kolumnę 'Launched', konwertując na typ numeryczny i stosując capping."""
+    if 'Launched' in df.columns:
+        try:
+            df['Launched'] = pd.to_numeric(df['Launched'], errors='coerce')
+            df['Launched'] = df['Launched'].fillna(df['Launched'].mean())
 
-# 2. Wykryj outliery na WYPEŁNIONYCH danych (df_filled)
-#    Oblicz Z-score tylko dla kolumn numerycznych
-z_scores = np.abs(stats.zscore(df_filled[numeric_cols]))
+            if pd.api.types.is_numeric_dtype(df['Launched']):
+                upper_limit = df['Launched'].quantile(0.95)
+                df['Launched_Capped'] = np.where(df['Launched'] > upper_limit, upper_limit, df['Launched'])
+        except ValueError:
+            print("Kolumna 'Launched' nie może być przekonwertowana na typ numeryczny.")
+            df['Launched_Capped'] = df['Launched'] #dodanie Launched_Capped nawet jesli konwersja sie nie powiedzie.
 
-#    Stwórz DataFrame bez outlierów (opcjonalnie, możesz też zastąpić outliery)
-df_no_outliers = df_filled[(z_scores < 3).all(axis=1)]
+    else:
+        print("Kolumna 'Launched' nie istnieje.")
+        df['Launched_Capped'] = None  # Or some other default value
+    return df
 
-# 3. Obsługa górnych wartości w 'Launched' (jeśli kolumna istnieje i jest numeryczna)
-if 'Launched' in df_filled.columns and pd.api.types.is_numeric_dtype(df_filled['Launched']):
-    upper_limit = df_filled['Launched'].quantile(0.95)
-    # Stwórz NOWĄ kolumnę, aby nie nadpisywać oryginalnej
-    df_filled['Launched_Capped'] = np.where(df_filled['Launched'] > upper_limit, upper_limit, df_filled['Launched'])
 
-    #Alternatywa, jesli chcesz to zrobic na df_no_outliers, i ta kolumna jest numeryczna
-    if 'Launched' in df_no_outliers.columns and pd.api.types.is_numeric_dtype(df_no_outliers['Launched']):
-      upper_limit_no = df_no_outliers['Launched'].quantile(0.95)
-      df_no_outliers['Launched_Capped'] = np.where(df_no_outliers['Launched'] > upper_limit_no, upper_limit_no, df_no_outliers['Launched'])
+def cap_numeric_columns(df):
+    """Stosuje capping (5. i 95. percentyl) do kolumn numerycznych (oprócz 'Launched')."""
+    numeric_cols = df.select_dtypes(include=np.number).columns
+    for col in numeric_cols:
+        if col != 'Launched' and col != 'Launched_Capped':  # Exclude 'Launched' and 'Launched_Capped'
+            upper_limit = df[col].quantile(0.95)
+            lower_limit = df[col].quantile(0.05)
+            df[col + '_Capped'] = np.where(df[col] > upper_limit, upper_limit,
+                                            np.where(df[col] < lower_limit, lower_limit, df[col]))
+    return df
+
+def scale_data(df, method='minmax'):
+    """Skaluje dane numeryczne (MinMaxScaler lub StandardScaler).
+
+    Args:
+        df: DataFrame do przeskalowania.
+        method: 'minmax' (domyślnie) lub 'standard'.
+
+    Returns:
+        DataFrame: Przeskalowany DataFrame.  Zwraca pusty DataFrame, jeśli nie ma nic do skalowania.
+    """
+
+    numeric_cols_capped = [col for col in df.columns if '_Capped' in col or col == "Launched_Capped"]
+    if 'Launched_Capped' in df.columns and 'Launched' in numeric_cols_capped:
+      numeric_cols_capped.remove("Launched")
+    if not numeric_cols_capped:
+        print(f"Brak kolumn numerycznych do skalowania metodą {method}.")
+        return pd.DataFrame(index=df.index)
+
+    if method == 'minmax':
+        scaler = MinMaxScaler()
+    elif method == 'standard':
+        scaler = StandardScaler()
+    else:
+        raise ValueError("Nieobsługiwana metoda skalowania.  Wybierz 'minmax' lub 'standard'.")
+
+    df_scaled = pd.DataFrame(scaler.fit_transform(df[numeric_cols_capped]),
+                                columns=numeric_cols_capped, index=df.index)
+    return df_scaled
+
+
+
+def encode_categorical_variables(df, scaled_df):
+    """Koduje zmienne kategoryczne (One-Hot Encoding)."""
     
-else:
-    print("Kolumna 'Launched' nie istnieje lub nie jest numeryczna.")
+    numeric_cols_capped = [col for col in df.columns if '_Capped' in col or col == "Launched_Capped"]
+    if 'Launched_Capped' in df.columns and 'Launched' in numeric_cols_capped:
+       numeric_cols_capped.remove("Launched")
+    
+    df_for_encoding = df.drop(columns=numeric_cols_capped, errors='ignore').join(scaled_df)
+
+    df_encoded = pd.get_dummies(df_for_encoding)
+
+    return df_encoded
 
 
-# Teraz masz:
-# - df: oryginalny DataFrame
-# - df_filled: DataFrame z wypełnionymi brakującymi danymi
-# - df_no_outliers: DataFrame z usuniętymi outlierami (na podstawie Z-score)
-# - df_filled (i/lub df_no_outliers): z dodatkową kolumną 'Launched_Capped', jeśli 'Launched' istniała i była numeryczna
-print(df_filled.head()) #sprawdz
-print(df_no_outliers.head()) #sprawdz
+def save_processed_data(df, filepath):
+    """Zapisuje przetworzone dane do pliku CSV."""
+    df.to_csv(filepath, index=False)
+    print(f'Data cleaning and preprocessing complete. File saved as {filepath}')
+
+
+def preprocess_data(input_filepath, output_filepath_filled, output_filepath_no_outliers):
+    """Główna funkcja do przetwarzania danych.
+
+    Args:
+        input_filepath: Ścieżka do pliku CSV z danymi wejściowymi.
+        output_filepath_filled: Ścieżka do pliku CSV, gdzie zostaną zapisane dane z wypełnionymi brakami i cappingiem.
+        output_filepath_no_outliers: Ścieżka do pliku CSV, gdzie zostaną zapisane dane z usuniętymi outlierami.
+    """
+
+    # 1. Wczytaj dane
+    df = load_data(input_filepath)
+
+    # 2. Wypełnij brakujące dane
+    df_filled = handle_missing_values(df)
+
+    # 3. Obsłuż outliery (usuwanie)
+    df_no_outliers = handle_outliers(df_filled.copy()) # Pracuj na kopii
+
+    # 4. Obsłuż kolumnę 'Launched' (df_filled)
+    df_filled = handle_launched_column(df_filled)
+
+    # 5. Obsłuż kolumnę 'Launched (df_no_outliers)
+    df_no_outliers = handle_launched_column(df_no_outliers)
+
+
+    # 6. Capping pozostałych kolumn numerycznych (df_filled)
+    df_filled = cap_numeric_columns(df_filled)
+
+
+    #7. Skalowanie danych - df_filled (minmax i standard)
+    df_filled_scaled_minmax = scale_data(df_filled, method='minmax')
+    df_filled_scaled_standard = scale_data(df_filled, method='standard')
+
+    #8. Skalowanie danych - df_no_outliers (minmax i standard)
+    df_no_outliers_scaled_minmax = scale_data(df_no_outliers, method='minmax')
+    df_no_outliers_scaled_standard = scale_data(df_no_outliers, method='standard')
+
+    #9. Kodowanie zmiennych kategorycznych (df_filled)
+    df_filled_encoded = encode_categorical_variables(df_filled, df_filled_scaled_minmax) #uzywam wersji minmax do enkodowania
+
+    # 10. Kodowanie zmiennych kategorycznych (df_no_outliers)
+    df_no_outliers_encoded = encode_categorical_variables(df_no_outliers, df_no_outliers_scaled_minmax)
+
+    # 11. Zapisz przetworzone dane
+    save_processed_data(df_filled_encoded, output_filepath_filled)
+    save_processed_data(df_no_outliers_encoded, output_filepath_no_outliers)
 
 
 
-# --- Dodanie kolejnych kroków z instrukcji ---
-
-# Step 4: Handle outliers (już częściowo zrobione, ale rozszerzamy)
-# Outliery już wykryliśmy i usunęliśmy w df_no_outliers.
-# Teraz dodajemy alternatywne podejście: capping (ograniczanie wartości)
-# Zastosujemy capping na df_filled, dla każdej kolumny numerycznej
-
-for col in numeric_cols:
-    if col != 'Launched':  # Launched już obsłużyliśmy
-        upper_limit = df_filled[col].quantile(0.95)
-        lower_limit = df_filled[col].quantile(0.05)
-        df_filled[col + '_Capped'] = np.where(df_filled[col] > upper_limit, upper_limit,
-                                            np.where(df_filled[col] < lower_limit, lower_limit, df_filled[col]))
-
-
-# Step 5: Scale and normalize data
-# Wykorzystamy MinMaxScaler (do zakresu [0, 1]) i StandardScaler (do średniej 0 i odch. stand. 1)
-# Zastosujemy skalowanie do df_filled (po cappingu) ORAZ do df_no_outliers
-
-# Min-Max Scaling (df_filled)
-scaler_minmax_filled = MinMaxScaler()
-numeric_cols_filled_capped = [col for col in df_filled.columns if '_Capped' in col or col == 'Launched_Capped']
-df_filled_scaled = pd.DataFrame(scaler_minmax_filled.fit_transform(df_filled[numeric_cols_filled_capped]),
-                                columns=numeric_cols_filled_capped, index=df_filled.index)
-
-# Z-score Standardization (df_filled)
-scaler_standard_filled = StandardScaler()
-df_filled_standardized = pd.DataFrame(scaler_standard_filled.fit_transform(df_filled[numeric_cols_filled_capped]),
-                                      columns=numeric_cols_filled_capped, index = df_filled.index)
-
-
-# Min-Max Scaling (df_no_outliers - wersja z usuniętymi outlierami)
-if 'Launched_Capped' in df_no_outliers.columns:
-    cols_to_scale_no =  df_no_outliers.select_dtypes(include=np.number).columns.tolist()
-else:
-   cols_to_scale_no = [col for col in df_no_outliers.select_dtypes(include=np.number).columns if col != "Launched"]
-
-scaler_minmax_no = MinMaxScaler()
-
-df_no_outliers_scaled = pd.DataFrame(scaler_minmax_no.fit_transform(df_no_outliers[cols_to_scale_no]),
-                                    columns=cols_to_scale_no, index = df_no_outliers.index)
-
-
-# Z-score Standardization (df_no_outliers)
-scaler_standard_no = StandardScaler()
-df_no_outliers_standardized = pd.DataFrame(scaler_standard_no.fit_transform(df_no_outliers[cols_to_scale_no]),
-                                            columns=cols_to_scale_no, index = df_no_outliers.index)
-
-
-
-
-# Step 6: Encode categorical variables
-# Kodowanie zmiennych kategorycznych (One-Hot Encoding)
-
-# Najpierw połączmy przeskalowane dane numeryczne z oryginalnymi danymi tekstowymi, aby mieć wszystko w jednym DataFrame
-
-# Dla df_filled:
-df_filled_for_encoding = df_filled.drop(columns=numeric_cols_filled_capped).join(df_filled_scaled)
-df_filled_encoded = pd.get_dummies(df_filled_for_encoding)  #domyślnie koduje wszystkie kolumny object
-
-# Dla df_no_outliers:
-df_no_outliers_for_encoding = df_no_outliers.drop(columns=cols_to_scale_no).join(df_no_outliers_scaled)
-df_no_outliers_encoded = pd.get_dummies(df_no_outliers_for_encoding)
-
-
-# Step 7: Save the cleaned and preprocessed data
-# Zapisanie przetworzonych danych do plików CSV
-
-df_filled_encoded.to_csv('cleaned_preprocessed_filled.csv', index=False)
-df_no_outliers_encoded.to_csv('cleaned_preprocessed_no_outliers.csv', index=False)
-
-print('Data cleaning and preprocessing complete. Files saved.')
+# Przykładowe użycie:
+if __name__ == "__main__":
+    preprocess_data('scraped_data.csv', 'cleaned_preprocessed_filled.csv', 'cleaned_preprocessed_no_outliers.csv')
