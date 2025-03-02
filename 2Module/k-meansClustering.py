@@ -2,6 +2,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
+import os
+import psutil
+import warnings
+os.environ["OMP_NUM_THREADS"] = "1"
 
 # Create a sample dataset with customer annual income and spending score
 data = {'AnnualIncome': [
