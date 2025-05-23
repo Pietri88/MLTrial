@@ -7,6 +7,10 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 import matplotlib.pyplot as plt
 from sklearn import tree
+import matplotlib
+matplotlib.use('TkAgg')
+
+
 
 
 # Przykładowy zbiór danych: Godziny nauki, wynik z poprzedniego egzaminu i wynik końcowy
