@@ -1,0 +1,83 @@
+{
+    "slow_internet": {
+      "symptom": "My internet is very slow.",
+      "solution": "Try restarting your router and checking your connection settings."
+    },
+    "app_crashing": {
+      "symptom": "The app keeps crashing on startup.",
+      "solution": "Update the app to the latest version and restart your device."
+    },
+    "no_sound": {
+      "symptom": "I can't hear any sound from my computer.",
+      "solution": "Check your audio output settings and ensure the volume is not muted."
+    },
+    "blue_screen": {
+      "symptom": "My computer shows a blue screen and restarts.",
+      "solution": "Scan your system for driver issues and run a memory test."
+    },
+    "printer_not_working": {
+      "symptom": "My printer is not printing anything.",
+      "solution": "Make sure the printer is turned on, connected properly, and has paper and ink."
+    },
+    "wifi_not_connecting": {
+      "symptom": "I can't connect to Wi-Fi.",
+      "solution": "Forget the network and reconnect by entering your Wi-Fi password again."
+    },
+    "frozen_screen": {
+      "symptom": "My computer screen is frozen and not responding.",
+      "solution": "Try pressing Ctrl + Alt + Delete and restarting the system."
+    },
+    "battery_drain": {
+      "symptom": "My laptop battery drains very quickly.",
+      "solution": "Reduce screen brightness, close unused apps, and check for battery-draining background processes."
+    },
+    "keyboard_not_working": {
+      "symptom": "My keyboard is not responding.",
+      "solution": "Unplug and replug your keyboard or restart the computer."
+    },
+    "mouse_not_moving": {
+      "symptom": "My mouse cursor is not moving.",
+      "solution": "Check the mouse connection and clean the sensor area."
+    },
+    "camera_not_detected": {
+      "symptom": "My camera is not working in video calls.",
+      "solution": "Check camera permissions in your system settings and restart the app."
+    },
+    "screen_flickering": {
+      "symptom": "My monitor keeps flickering.",
+      "solution": "Update your graphics drivers and check the cable connection."
+    },
+    "overheating": {
+      "symptom": "My computer gets very hot quickly.",
+      "solution": "Clean the vents and fans, and avoid using it on soft surfaces."
+    },
+    "software_not_installing": {
+      "symptom": "I can't install the software.",
+      "solution": "Run the installer as administrator and make sure you have enough storage space."
+    },
+    "updates_not_working": {
+      "symptom": "Windows updates fail to install.",
+      "solution": "Run the Windows Update Troubleshooter and restart your computer."
+    },
+    "microphone_not_working": {
+      "symptom": "Others can't hear me during calls.",
+      "solution": "Check if your microphone is muted and has the right permissions enabled."
+    },
+    "disk_space_low": {
+      "symptom": "I'm running out of storage space.",
+      "solution": "Delete unnecessary files or use disk cleanup tools."
+    },
+    "vpn_not_connecting": {
+      "symptom": "My VPN won't connect.",
+      "solution": "Check your internet connection and try a different VPN server."
+    },
+    "browser_slow": {
+      "symptom": "My web browser is very slow.",
+      "solution": "Clear your cache and disable unnecessary extensions."
+    },
+    "file_won't_open": {
+      "symptom": "I can't open a specific file.",
+      "solution": "Make sure the file is not corrupted and that you have the correct application to open it."
+    }
+  }
+  
